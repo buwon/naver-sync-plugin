@@ -1,0 +1,372 @@
+import { remote } from 'electron'
+import { Notice } from 'obsidian'
+import { Browser } from 'src/browser'
+import { ItemInfoType } from 'src/types'
+import { BaseProviderType, ProviderItemInfoType } from './base'
+
+interface NaverFolderType {
+  folderName: string
+  folderType: number
+  colorId: number
+  sortOrder: number
+  folderId: number
+  name: string
+  isRepresent: boolean
+  isDelete: boolean
+  memoCount: number
+  lock: boolean
+  createdTime: number
+  lastModifiedTime: number
+  serverRegisterMillis: number
+  serverModifyMillis: number
+  changerDeviceNo: number
+  defaultFolder: boolean
+  isDefaultFolder: boolean
+  cuttedFolderName: string
+}
+
+interface NaverFolderListResponseType {
+  code: 'FAIL' | 'SUCCESS'
+  message: string
+  data: {
+    folderList: NaverFolderType[]
+  }
+}
+
+interface NaverMemoListType {
+  memoSeq: number
+  title: string
+  lastModifiedTime: number
+  serverLastModifiedTime: number
+  folderId: number
+  memoPlainContent: string
+
+  memberId: string
+  content: string
+  shortVersion: boolean
+  images: any[]
+  createdTime: number
+  clientType: string
+  colorId: number
+  todo: boolean
+  deleted: boolean
+  restorable: boolean
+  important: boolean
+  editorVersion: number
+  serverCreatedTime: number
+  serverMetaTime: number
+  changerDeviceNo: number
+  pinTime: number
+  lock: boolean
+  modifyDate: string
+  memoContent: string
+  registerDate: string
+  imgList: any[]
+  clientTypeCode: number
+  registDate: string
+  lastModifyDate: string
+  imageList: any[]
+  audioList: any[]
+  openGraphList: any[]
+  existsAudio: boolean
+  comments: any[]
+}
+
+interface NaverMemoListResponseType {
+  code: 'FAIL' | 'SUCCESS'
+  message: string
+  data: {
+    memoList: NaverMemoListType[]
+    nextCursor: string
+    totalCount: number
+  }
+}
+
+interface NaverMemoType {
+  memberId: string
+  memoSeq: number
+  folderId: number
+  title: string
+  content: string
+  memoPlainContent: string
+  shortVersion: boolean
+  images: any[]
+  createdTime: number
+  lastModifiedTime: number
+  clientType: string
+  colorId: number
+  todo: boolean
+  deleted: boolean
+  restorable: boolean
+  important: boolean
+  editorVersion: number
+  serverCreatedTime: number
+  serverLastModifiedTime: number
+  serverMetaTime: number
+  changerDeviceNo: number
+  pinTime: number
+  lock: boolean
+  modifyDate: string
+  memoContent: string
+  registerDate: string
+  imgList: any[]
+  clientTypeCode: number
+  registDate: string
+  lastModifyDate: string
+  imageList: any[]
+  audioList: any[]
+  openGraphList: any[]
+  existsAudio: boolean
+  comments: any[]
+}
+
+interface NaverMemoResponseType {
+  code: 'FAIL' | 'SUCCESS'
+  message: string
+  data: NaverMemoType
+}
+
+export const NaverProvider = (): BaseProviderType => {
+  const state = {
+    browser: new Browser(),
+    memos: {} as Record<string, ProviderItemInfoType>,
+  }
+
+  async function fetch(url: string, options: any): Promise<any> {
+    return state.browser.webContents.executeJavaScript(`
+			fetch(window.location.origin + "${url}" , {
+			method: '${options.method}',
+			headers: {
+				"Userid": window.USER_ID,
+			},
+			body: new URLSearchParams(${JSON.stringify(options.body)}),
+			}).then(response => response.json())
+		`)
+  }
+
+  async function open(): Promise<void> {
+    await state.browser.loadURL('https://memo.naver.com/')
+  }
+
+  async function close() {
+    state.browser.close()
+  }
+
+  async function isReady(): Promise<boolean> {
+    const url = state.browser.webContents.getURL()
+    if (url.includes('login')) {
+      throw new Error('Naver not logged in')
+    }
+
+    return true
+  }
+
+  async function fetchGroupList(): Promise<any[]> {
+    const url = '/folder/folderList'
+    const resp: NaverFolderListResponseType = await fetch(url, {
+      method: 'POST',
+      body: {},
+    })
+    const groupList = resp.data.folderList.map((folder) => ({
+      id: folder.folderId.toString(),
+      name: folder.folderName,
+    }))
+
+    return groupList
+  }
+
+  async function fetchMemoList(
+    folderId: number,
+    cursor: string,
+  ): Promise<NaverMemoListResponseType> {
+    const url = '/api/memo/select/list'
+    const resp: NaverMemoListResponseType = await fetch(url, {
+      method: 'POST',
+      body: {
+        folderId: `${folderId}`,
+        cursor: cursor,
+        sizePerPage: '40',
+        contentLength: '1000',
+        sortCode: 'PIN_DESC_MODIFIED_TIME_DESC',
+        startTime: '0',
+        endTime: '0',
+        includeDeletedMemo: 'false',
+        excludeHtml: 'true',
+      },
+    })
+
+    return resp
+  }
+
+  async function fetchItemList(groupId: string): Promise<ItemInfoType[]> {
+    let finished = false
+    let cursor = ''
+    let memoList = [] as NaverMemoListType[]
+    while (!finished) {
+      const resp = await fetchMemoList(parseInt(groupId), cursor)
+      if ('FAIL' === resp.code) {
+        throw new Error(`Failed to fetch memo list: ${resp.message}`)
+      }
+      const totalCount = resp.data.totalCount
+      cursor = resp.data.nextCursor
+      memoList = memoList.concat(resp.data.memoList)
+      if (memoList.length >= totalCount || !cursor) {
+        finished = true
+      }
+    }
+    const itemList: ItemInfoType[] = memoList.map((memo) => {
+      const key = memo.title
+      const plainContent = memo.memoPlainContent.split(';')
+      const mTime = parseInt(plainContent[0])
+      const cTime = parseInt(plainContent[1])
+      const status = plainContent[2]
+      const size = parseInt(plainContent[3])
+      const content = plainContent.length > 5 ? plainContent[4] : null
+
+      state.memos[key] = {
+        id: `${memo.memoSeq}`,
+        groupId: `${memo.folderId}`,
+        key,
+        cTime: cTime,
+        mTime: mTime,
+        size: size,
+        status,
+        content,
+      }
+
+      return { key, cTime, mTime, size, status }
+    })
+
+    return itemList
+  }
+
+  async function fetchItemInfo(key: string): Promise<ProviderItemInfoType | null> {
+    const memo = state.memos[key]
+    if (memo) {
+      if (null === memo.content) {
+        const url = `/api/memo/select`
+        const resp: NaverMemoResponseType = await fetch(url, {
+          method: 'POST',
+          body: {
+            memoSeq: memo.id,
+          },
+        })
+        const [, , , , content] = resp.data.memoPlainContent.split(';')
+        memo.content = content
+      }
+      return memo
+    }
+    return null
+  }
+
+  async function downloadFile(key: string): Promise<ArrayBuffer | null> {
+    const item = await fetchItemInfo(key)
+
+    if (item?.content) {
+      return Buffer.from(item.content, 'base64').buffer
+    }
+
+    return null
+  }
+
+  async function createMemo(groupId: string, item: ItemInfoType): Promise<ProviderItemInfoType> {
+    const url = '/memo/writeMemo'
+    const { data }: NaverMemoResponseType = await fetch(url, {
+      method: 'POST',
+      body: {
+        title: item.key,
+        memoContent: `${item.mTime};${item.cTime};N;${item.size};;`,
+        important: false,
+        colorId: 0,
+        folderId: parseInt(groupId),
+        editorVersion: 1,
+      },
+    })
+
+    return {
+      id: `${data.memoSeq}`,
+      groupId: `${data.folderId}`,
+      key: item.key,
+      cTime: item.cTime,
+      mTime: item.mTime,
+      size: item.size,
+      status: 'N',
+      content: null,
+    }
+  }
+
+  async function uploadFile(
+    item: ItemInfoType,
+    groupId: string,
+    data: ArrayBuffer,
+  ): Promise<boolean> {
+    if (!state.memos[item.key]) {
+      state.memos[item.key] = await createMemo(groupId, item)
+    }
+
+    const memo = state.memos[item.key]
+    const content = Buffer.from(data).toString('base64')
+    const memoContent = `${item.mTime};${item.cTime};N;${item.size};${content};`
+
+    // update
+    const url = '/memo/updateMemo'
+    const resp = await fetch(url, {
+      method: 'POST',
+      body: {
+        memoSeq: parseInt(memo.id),
+        title: item.key,
+        memoContent: memoContent,
+        important: false,
+        colorId: 0,
+        folderId: parseInt(memo.groupId),
+        editorVersion: 1,
+        pinTime: 0,
+      },
+    })
+
+    return 'SUCCESS' === resp.code
+  }
+
+  async function deleteFile(item: ItemInfoType, groupId: string): Promise<boolean> {
+    if (!state.memos[item.key]) {
+      state.memos[item.key] = await createMemo(groupId, item)
+    }
+
+    const memo = await fetchItemInfo(item.key)
+    if (memo && null !== memo.content) {
+      const [mTime, cTime, status, size, content] = memo.content.split(';')
+      const memoContent = `${mTime};${cTime};D;${size};${content};`
+
+      const url = '/memo/updateMemo'
+      const resp = await fetch(url, {
+        method: 'POST',
+        body: {
+          memoSeq: parseInt(memo.id),
+          title: item.key,
+          memoContent,
+          important: false,
+          colorId: 0,
+          folderId: parseInt(memo.groupId),
+          editorVersion: 1,
+          pinTime: 0,
+        },
+      })
+
+      return 'SUCCESS' === resp.code
+    }
+
+    return false
+  }
+
+  return {
+    open,
+    close,
+    isReady,
+    fetchGroupList,
+    fetchItemList,
+    fetchItemInfo,
+    downloadFile,
+    uploadFile,
+    deleteFile,
+  }
+}
