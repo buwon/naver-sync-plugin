@@ -1,8 +1,8 @@
 import { remote } from 'electron'
 import { Notice } from 'obsidian'
 import { Browser } from 'src/browser'
-import { ItemInfoType } from 'src/types'
-import { BaseProviderType, ProviderItemInfoType } from './base'
+import { GroupInfoType, ItemInfoType } from 'src/types'
+import { BaseProviderType, ProviderItemInfoType } from '../base'
 
 interface NaverFolderType {
   folderName: string
@@ -126,9 +126,10 @@ interface NaverMemoResponseType {
   data: NaverMemoType
 }
 
-export const NaverProvider = (): BaseProviderType => {
+export const NaverProvider = (): BaseProviderType & { setGroupId(groupId: string): void } => {
   const state = {
     browser: new Browser(),
+    groupId: 0 as number,
     memos: {} as Record<string, ProviderItemInfoType>,
   }
 
@@ -152,6 +153,81 @@ export const NaverProvider = (): BaseProviderType => {
     state.browser.close()
   }
 
+  async function login(options = {}) {
+    const { id, password, oneTime } = options as {
+      id?: string
+      password?: string
+      oneTime?: string
+    }
+
+    if (id && password) {
+      const url =
+        'https://nid.naver.com/nidlogin.login?mode=form&url=https%3A%2F%2Fwww.naver.com%2F'
+      await state.browser.loadURL(url)
+
+      await state.browser.executeMoveScript(`
+async function typeText(element, text, delayMs = 100) {
+  for (const char of text) {
+    element.value += char;
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+  }
+}
+
+const idInput = document.getElementById('id');
+const pwInput = document.getElementById('pw');
+Promise.resolve()
+  .then(async () => {
+    await typeText(idInput, '${id}', 100);
+  })
+  .then(async () => {
+    await typeText(pwInput, '${password}', 100);
+  })
+  .then(() => {
+    if (!document.getElementById('keep').classList.contains('check')) {
+      document.getElementById('keep').click();    
+    }
+    document.getElementById('frmNIDLogin').submit();
+  });
+    `)
+    } else if (oneTime) {
+      const url =
+        'https://nid.naver.com/nidlogin.login?mode=number&url=https%3A%2F%2Fwww.naver.com%2F&locale=ko_KR&svctype=1'
+      await state.browser.loadURL(url)
+
+      await state.browser.executeMoveScript(`
+async function typeText(element, text, delayMs = 100) {
+  for (const char of text) {
+    element.value += char;
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+  }
+}
+
+const disposableInput = document.getElementById('disposable');
+Promise.resolve()
+  .then(async () => {
+    await typeText(disposableInput, '${oneTime}', 100);
+  })
+  .then(() => {
+    document.getElementById('frmNIDLogin').submit();
+  });
+    `)
+    }
+
+    const isReady = await this.isReady().catch(() => false)
+    return isReady
+  }
+
+  async function logout() {
+    const url = 'https://nid.naver.com/nidlogin.logout?returl=https://www.naver.com'
+    await state.browser.loadURL(url)
+
+    return true
+  }
+
   async function isReady(): Promise<boolean> {
     const url = state.browser.webContents.getURL()
     if (url.includes('login')) {
@@ -161,13 +237,13 @@ export const NaverProvider = (): BaseProviderType => {
     return true
   }
 
-  async function fetchGroupList(): Promise<any[]> {
+  async function fetchGroupList(): Promise<GroupInfoType[]> {
     const url = '/folder/folderList'
     const resp: NaverFolderListResponseType = await fetch(url, {
       method: 'POST',
       body: {},
     })
-    const groupList = resp.data.folderList.map((folder) => ({
+    const groupList: GroupInfoType[] = resp.data.folderList.map((folder) => ({
       id: folder.folderId.toString(),
       name: folder.folderName,
     }))
@@ -175,15 +251,12 @@ export const NaverProvider = (): BaseProviderType => {
     return groupList
   }
 
-  async function fetchMemoList(
-    folderId: number,
-    cursor: string,
-  ): Promise<NaverMemoListResponseType> {
+  async function fetchMemoList(cursor: string): Promise<NaverMemoListResponseType> {
     const url = '/api/memo/select/list'
     const resp: NaverMemoListResponseType = await fetch(url, {
       method: 'POST',
       body: {
-        folderId: `${folderId}`,
+        folderId: `${state.groupId}`,
         cursor: cursor,
         sizePerPage: '40',
         contentLength: '1000',
@@ -198,12 +271,12 @@ export const NaverProvider = (): BaseProviderType => {
     return resp
   }
 
-  async function fetchItemList(groupId: string): Promise<ItemInfoType[]> {
+  async function fetchItemList(): Promise<ItemInfoType[]> {
     let finished = false
     let cursor = ''
     let memoList = [] as NaverMemoListType[]
     while (!finished) {
-      const resp = await fetchMemoList(parseInt(groupId), cursor)
+      const resp = await fetchMemoList(cursor)
       if ('FAIL' === resp.code) {
         throw new Error(`Failed to fetch memo list: ${resp.message}`)
       }
@@ -269,7 +342,7 @@ export const NaverProvider = (): BaseProviderType => {
     return null
   }
 
-  async function createMemo(groupId: string, item: ItemInfoType): Promise<ProviderItemInfoType> {
+  async function createMemo(item: ItemInfoType): Promise<ProviderItemInfoType> {
     const url = '/memo/writeMemo'
     const { data }: NaverMemoResponseType = await fetch(url, {
       method: 'POST',
@@ -278,7 +351,7 @@ export const NaverProvider = (): BaseProviderType => {
         memoContent: `${item.mTime};${item.cTime};N;${item.size};;`,
         important: false,
         colorId: 0,
-        folderId: parseInt(groupId),
+        folderId: state.groupId,
         editorVersion: 1,
       },
     })
@@ -295,13 +368,9 @@ export const NaverProvider = (): BaseProviderType => {
     }
   }
 
-  async function uploadFile(
-    item: ItemInfoType,
-    groupId: string,
-    data: ArrayBuffer,
-  ): Promise<boolean> {
+  async function uploadFile(item: ItemInfoType, data: ArrayBuffer): Promise<boolean> {
     if (!state.memos[item.key]) {
-      state.memos[item.key] = await createMemo(groupId, item)
+      state.memos[item.key] = await createMemo(item)
     }
 
     const memo = state.memos[item.key]
@@ -327,9 +396,9 @@ export const NaverProvider = (): BaseProviderType => {
     return 'SUCCESS' === resp.code
   }
 
-  async function deleteFile(item: ItemInfoType, groupId: string): Promise<boolean> {
+  async function deleteFile(item: ItemInfoType): Promise<boolean> {
     if (!state.memos[item.key]) {
-      state.memos[item.key] = await createMemo(groupId, item)
+      state.memos[item.key] = await createMemo(item)
     }
 
     const memo = await fetchItemInfo(item.key)
@@ -361,7 +430,12 @@ export const NaverProvider = (): BaseProviderType => {
   return {
     open,
     close,
+    login,
+    logout,
     isReady,
+    setGroupId(groupId: string) {
+      state.groupId = parseInt(groupId)
+    },
     fetchGroupList,
     fetchItemList,
     fetchItemInfo,
