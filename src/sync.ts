@@ -1,6 +1,7 @@
 import { TAbstractFile, TFile, Vault } from 'obsidian'
 import { db } from './database'
 import { ItemInfoType } from './types'
+import { Remote } from './remote'
 
 function getFileByPath(vault: Vault, path: string): TFile | null {
   const file: TAbstractFile | null = vault.getAbstractFileByPath(path)
@@ -11,7 +12,10 @@ function getFileByPath(vault: Vault, path: string): TFile | null {
   return null
 }
 
-export async function sync(vault: Vault, remote) {
+export async function sync(vault: Vault, remote: Remote) {
+  // update sync start time
+  await db.state.put({ key: 'lastSyncTime', value: Date.now() })
+
   const files = await db.file.toArray().then((items) => {
     const fileMap = new Map<string, ItemInfoType>()
     items.forEach((item) => {
@@ -19,6 +23,9 @@ export async function sync(vault: Vault, remote) {
     })
     return fileMap
   })
+
+  // clear local db
+  await db.file.clear()
 
   // download list
   const remoteList: ItemInfoType[] = await remote.fetchList()
@@ -44,20 +51,24 @@ export async function sync(vault: Vault, remote) {
         await vault.delete(file)
       } else {
         const content = await remote.downloadFile(key)
-        await vault.modifyBinary(file, content, {
-          ctime: remoteItem.cTime,
-          mtime: remoteItem.mTime,
-        })
+        if (content) {
+          await vault.modifyBinary(file, content, {
+            ctime: remoteItem.cTime,
+            mtime: remoteItem.mTime,
+          })
+        }
       }
     } else {
       if ('D' === remoteItem.status) {
         continue
       } else {
         const content = await remote.downloadFile(key)
-        await vault.createBinary(key, content, {
-          ctime: remoteItem.cTime,
-          mtime: remoteItem.mTime,
-        })
+        if (content) {
+          await vault.createBinary(key, content, {
+            ctime: remoteItem.cTime,
+            mtime: remoteItem.mTime,
+          })
+        }
       }
     }
   }
@@ -75,9 +86,6 @@ export async function sync(vault: Vault, remote) {
     const content = await vault.readBinary(file)
     await remote.uploadFile(localItem, content)
   }
-
-  // clear local db
-  await db.file.clear()
 
   // update last sync time
   await db.state.put({ key: 'lastSyncTime', value: Date.now() })

@@ -5,3 +5,8 @@ export interface ItemInfoType {
   mTime: number
   size: number
 }
+
+export interface GroupInfoType {
+  id: string
+  name: string
+}

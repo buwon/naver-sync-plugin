@@ -5,16 +5,19 @@ export class Browser {
 
   get browser(): Electron.BrowserWindow {
     if (!this.browserWindow) {
-      this.browserWindow = this.browserWindow
-        ? this.browserWindow
-        : new remote.BrowserWindow({
-            width: 800,
-            height: 600,
-            webPreferences: {
-              nodeIntegration: false,
-              contextIsolation: true,
-            },
-          })
+      const browserWindow = new remote.BrowserWindow({
+        width: 800,
+        height: 600,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+        },
+      })
+      browserWindow.once('close', () => {
+        this.browserWindow = null
+      })
+
+      this.browserWindow = browserWindow
     }
 
     return this.browserWindow as Electron.BrowserWindow
@@ -38,15 +41,12 @@ export class Browser {
     })
   }
 
-  fetch(url: string, options: any): Promise<any> {
-    return this.webContents.executeJavaScript(`
-			fetch("${url}" , {
-			method: '${options.method}',
-			headers: {
-				"Userid": window.USER_ID,
-			},
-			body: new URLSearchParams(${JSON.stringify(options.body)}),
-			}).then(response => response.json())
-		`)
+  async executeMoveScript(script: string, wait: number = 1000): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.webContents
+        .executeJavaScript(script)
+        .then(() => setTimeout(resolve, wait))
+        .catch(reject)
+    })
   }
 }
