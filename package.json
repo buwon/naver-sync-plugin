@@ -6,6 +6,7 @@
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"watch": "node esbuild.config.mjs",
+		"watch:naver": "bun build src/naver/main.ts --outfile=main.js --bundle --watch --target node --format cjs --external obsidian --external electron",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"version": "node version-bump.mjs && git add manifest.json versions.json"
 	},
