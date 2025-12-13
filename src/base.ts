@@ -7,6 +7,7 @@ export interface ProviderItemInfoType extends ItemInfoType {
 }
 
 export interface BaseProviderType {
+  web(): Electron.WebContents
   open(): Promise<void>
   close(): Promise<void>
   login(options: any): Promise<boolean>

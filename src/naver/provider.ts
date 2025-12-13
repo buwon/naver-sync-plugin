@@ -133,6 +133,10 @@ export const NaverProvider = (): BaseProviderType & { setGroupId(groupId: string
     memos: {} as Record<string, ProviderItemInfoType>,
   }
 
+  function web() {
+    return state.browser.webContents
+  }
+
   async function fetch(url: string, options: any): Promise<any> {
     return state.browser.webContents.executeJavaScript(`
 			fetch(window.location.origin + "${url}" , {
@@ -447,6 +451,7 @@ Promise.resolve()
   }
 
   return {
+    web,
     open,
     close,
     login,
