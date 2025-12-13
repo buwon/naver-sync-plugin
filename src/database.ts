@@ -1,14 +1,6 @@
 import { Dexie, EntityTable } from 'dexie'
 import { ItemInfoType } from './types'
 
-interface File {
-  key: string
-  mode: string
-  cTime: number
-  mTime: number
-  size: number
-}
-
 interface State {
   key: string
   value: number

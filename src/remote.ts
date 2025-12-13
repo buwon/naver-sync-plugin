@@ -27,14 +27,17 @@ export class Remote {
   }
 
   downloadFile(key: string) {
+    console.log('Downloading file:', key)
     return this.provider.downloadFile(key)
   }
 
   uploadFile(item: ItemInfoType, data: any) {
+    console.log('Uploading file:', item.key)
     return this.provider.uploadFile(item, data)
   }
 
   deleteFile(item: ItemInfoType) {
+    console.log('Deleting file:', item.key)
     return this.provider.deleteFile(item)
   }
 }

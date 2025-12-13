@@ -287,28 +287,53 @@ Promise.resolve()
         finished = true
       }
     }
-    const itemList: ItemInfoType[] = memoList.map((memo) => {
-      const key = memo.title
-      const plainContent = memo.memoPlainContent.split(';')
-      const mTime = parseInt(plainContent[0])
-      const cTime = parseInt(plainContent[1])
-      const status = plainContent[2]
-      const size = parseInt(plainContent[3])
-      const content = plainContent.length > 5 ? plainContent[4] : null
+    const itemList: ItemInfoType[] = memoList
+      .map((memo) => {
+        if (!memo.title.includes('.')) return null
 
-      state.memos[key] = {
-        id: `${memo.memoSeq}`,
-        groupId: `${memo.folderId}`,
-        key,
-        cTime: cTime,
-        mTime: mTime,
-        size: size,
-        status,
-        content,
-      }
+        const memoPlainContent = memo.memoPlainContent
+        if (memoPlainContent && memoPlainContent.split(';').length >= 4) {
+          const key = memo.title
+          const plainContent = memo.memoPlainContent.split(';')
+          const mTime = parseInt(plainContent[0])
+          const cTime = parseInt(plainContent[1])
+          const status = plainContent[2]
+          const size = parseInt(plainContent[3])
+          const content = plainContent.length > 5 ? plainContent[4] : null
 
-      return { key, cTime, mTime, size, status }
-    })
+          state.memos[key] = {
+            id: `${memo.memoSeq}`,
+            groupId: `${memo.folderId}`,
+            key,
+            cTime: cTime,
+            mTime: mTime,
+            size: size,
+            status,
+            content,
+          }
+
+          return { key, cTime, mTime, size, status }
+        }
+
+        const key = memo.title
+        const cTime = memo.createdTime
+        const mTime = memo.lastModifiedTime
+        const size = 0
+        const status = 'N'
+
+        state.memos[key] = {
+          id: `${memo.memoSeq}`,
+          groupId: `${memo.folderId}`,
+          key,
+          cTime,
+          mTime,
+          size,
+          status,
+          content: '',
+        }
+        return { key, cTime, mTime, size, status }
+      })
+      .filter((item): item is ItemInfoType => item !== null)
 
     return itemList
   }
@@ -401,30 +426,24 @@ Promise.resolve()
       state.memos[item.key] = await createMemo(item)
     }
 
-    const memo = await fetchItemInfo(item.key)
-    if (memo && null !== memo.content) {
-      const [mTime, cTime, status, size, content] = memo.content.split(';')
-      const memoContent = `${mTime};${cTime};D;${size};${content};`
+    const memo = state.memos[item.key]
+    const memoContent = `${item.mTime};${item.cTime};D;${item.size};;`
+    const url = '/memo/updateMemo'
+    const resp = await fetch(url, {
+      method: 'POST',
+      body: {
+        memoSeq: parseInt(memo.id),
+        title: item.key,
+        memoContent,
+        important: false,
+        colorId: 0,
+        folderId: parseInt(memo.groupId),
+        editorVersion: 1,
+        pinTime: 0,
+      },
+    })
 
-      const url = '/memo/updateMemo'
-      const resp = await fetch(url, {
-        method: 'POST',
-        body: {
-          memoSeq: parseInt(memo.id),
-          title: item.key,
-          memoContent,
-          important: false,
-          colorId: 0,
-          folderId: parseInt(memo.groupId),
-          editorVersion: 1,
-          pinTime: 0,
-        },
-      })
-
-      return 'SUCCESS' === resp.code
-    }
-
-    return false
+    return 'SUCCESS' === resp.code
   }
 
   return {

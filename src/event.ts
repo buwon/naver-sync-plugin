@@ -1,5 +1,7 @@
 import { TFile } from 'obsidian'
 import { db } from './database'
+import { syncState } from './syncState'
+import { ItemInfoType } from './types'
 
 function getFileInfo(file: TFile) {
   return {
@@ -12,25 +14,25 @@ function getFileInfo(file: TFile) {
 
 export const event = {
   modify: async (file: TFile) => {
+    if (syncState.lockFile.has(file.path)) return
+
     if (file instanceof TFile) {
       const item = {
-        mode: 'U',
+        status: 'U',
         ...getFileInfo(file),
       }
 
       db.file.put(item)
-      // const content = await this.app.vault.readBinary(file)
-      // const base64 = Buffer.from(content).toString('base64')
-      // const hash = await this.app.vault.getAbstractFileByPath(file.path)?.stat.hash
-      // console.log('File modified:', item, base64)
     }
     console.log('File modified:', file)
   },
 
   create: async (file: TFile) => {
+    if (syncState.lockFile.has(file.path)) return
+
     if (file instanceof TFile) {
       const item = {
-        mode: 'C',
+        status: 'C',
         ...getFileInfo(file),
       }
 
@@ -40,10 +42,13 @@ export const event = {
     }
   },
   delete: async (file: TFile) => {
+    if (syncState.lockFile.has(file.path)) return
+
     if (file instanceof TFile) {
-      const item = {
-        mode: 'D',
+      const item: ItemInfoType = {
+        status: 'D',
         ...getFileInfo(file),
+        mTime: Date.now(),
       }
 
       db.file.put(item)
@@ -52,17 +57,20 @@ export const event = {
     }
   },
   rename: async (file: TFile, oldPath: string) => {
+    if (syncState.lockFile.has(oldPath)) return
+
     if (file instanceof TFile) {
       const item = {
-        mode: 'C',
+        status: 'C',
         ...getFileInfo(file),
       }
       db.file.put(item)
 
-      const oldItem = {
-        mode: 'D',
+      const oldItem: ItemInfoType = {
+        status: 'D',
         ...getFileInfo(file),
         key: oldPath,
+        mTime: Date.now(),
       }
       db.file.put(oldItem)
     }

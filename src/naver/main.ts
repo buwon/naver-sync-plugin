@@ -1,34 +1,47 @@
-import {
-  App,
-  Editor,
-  MarkdownView,
-  Modal,
-  Notice,
-  Plugin,
-  PluginSettingTab,
-  Setting,
-  TFile,
-} from 'obsidian'
+import { App, Editor, MarkdownView, Modal, Notice, Plugin } from 'obsidian'
 import { db } from '../database'
 import { event } from '../event'
-import SyncPlugin from '../main'
 import { NaverProvider } from './provider'
 import { NaverSettingTab, NaverSyncPluginSettings } from './settings'
-// Remember to rename these classes and interfaces!
+import { createRemote } from 'src/remote'
+import { sync } from '../sync'
 
 export default class NaverSyncPlugin extends Plugin {
   settings: NaverSyncPluginSettings
-  provider: ReturnType<typeof NaverProvider>
 
   async onload() {
     await this.loadSettings()
 
-    this.provider = NaverProvider()
-
     this.addCommand({
       id: 'sync-naver',
-      name: 'Sync Naver',
-      callback: async () => {},
+      name: 'start sync',
+      callback: async () => {
+        const provider = NaverProvider()
+
+        try {
+          const startTime = Date.now()
+          await provider.open()
+          await provider.isReady()
+
+          const groupList = await provider.fetchGroupList()
+          const group = groupList.filter((group) => group.name === this.settings.folderName)
+          if (group.length === 0) {
+            throw new Error('지정한 폴더를 찾을 수 없습니다.')
+          }
+          provider.setGroupId(group[0].id)
+          const remote = createRemote(provider)
+          await sync(this.app.vault, remote)
+          console.log('Sync completed in', Date.now() - startTime, 'ms')
+        } catch (e) {
+          if (e instanceof Error) {
+            console.log('Sync error:', e)
+          }
+          new Notice(e.message)
+          return
+        } finally {
+          await provider.close()
+        }
+      },
     })
 
     // This creates an icon in the left ribbon.

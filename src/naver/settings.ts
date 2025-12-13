@@ -112,7 +112,6 @@ export class NaverSettingTab extends PluginSettingTab {
     this.containerEl.empty()
 
     this.containerEl.createEl('h3', { text: 'Naver Sync Settings' })
-    // new Setting(this.containerEl).setName('Naver Settings').setHeading()
 
     await this.provider.open()
     const ready = await this.provider.isReady().catch(() => false)

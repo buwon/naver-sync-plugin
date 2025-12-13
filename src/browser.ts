@@ -36,6 +36,14 @@ export class Browser {
 
   async loadURL(url: string): Promise<void> {
     return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error('loadURL timeout'))
+      }, 5000)
+
+      this.webContents.once('did-finish-load', () => {
+        clearTimeout(timeoutId)
+        resolve()
+      })
       this.webContents.once('did-finish-load', resolve)
       this.webContents.loadURL(url).catch(reject)
     })
