@@ -1,10 +1,37 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin } from 'obsidian'
+import {
+  App,
+  Editor,
+  MarkdownView,
+  Modal,
+  Notice,
+  Plugin,
+  request,
+  requestUrl,
+  TFile,
+} from 'obsidian'
 import { db } from '../database'
 import { event } from '../event'
-import { NaverProvider } from './provider'
+import { NaverDesktopProvider } from './desktopProvider'
 import { NaverSettingTab, NaverSyncPluginSettings } from './settings'
-import { createRemote } from 'src/remote'
+import { createRemote } from '../remote'
 import { sync } from '../sync'
+import { createNaverMobileProvider } from './mobileProvider'
+
+function eventCreate(file: TFile) {
+  event.emit('create', file)
+}
+
+function eventModify(file: TFile) {
+  event.emit('modify', file)
+}
+
+function eventDelete(file: TFile) {
+  event.emit('delete', file)
+}
+
+function eventRename(file: TFile, oldPath: string) {
+  event.emit('rename', file, oldPath)
+}
 
 export default class NaverSyncPlugin extends Plugin {
   settings: NaverSyncPluginSettings
@@ -16,7 +43,7 @@ export default class NaverSyncPlugin extends Plugin {
       id: 'sync-naver',
       name: 'start sync',
       callback: async () => {
-        const provider = NaverProvider()
+        const provider = NaverDesktopProvider()
 
         try {
           const startTime = Date.now()
@@ -121,25 +148,34 @@ export default class NaverSyncPlugin extends Plugin {
     // When registering intervals, this function will automatically clear the interval when the plugin is disabled.
     this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000))
 
-    this.app.vault.on('modify', event.modify)
-    this.app.vault.on('create', event.create)
-    this.app.vault.on('delete', event.delete)
-    this.app.vault.on('rename', event.rename)
+    this.app.vault.on('modify', eventModify)
+    this.app.vault.on('create', eventCreate)
+    this.app.vault.on('delete', eventDelete)
+    this.app.vault.on('rename', eventRename)
 
-    const state = await db.state.get('lastSyncTime')
-    console.log('Last sync time from DB:', state)
-    console.log('SyncPlugin loaded')
+    event.on('saveSettings', async (params: Record<string, any>) => {
+      this.settings = Object.assign({}, this.settings, params)
+      await this.saveData(this.settings)
+    })
 
-    const files = await db.file.toArray()
+    //
+    // const resp1 = await requestUrl({
+    //   url: 'https://www.naver.com',
+    //   method: 'GET',
+    //   headers: { cookie: `NID_AUT=${this.settings.NID_AUT}; NID_SES=${this.settings.NID_SES}` },
+    // })
 
-    console.log(files)
+    // const userId = resp1.text.match(/userId: '(.+)'/)[1]
+    // console.log('Naver userId:', userId)
   }
 
   onunload() {
-    this.app.vault.off('modify', event.modify)
-    this.app.vault.off('create', event.create)
-    this.app.vault.off('delete', event.delete)
-    this.app.vault.off('rename', event.rename)
+    event.off('saveSettings')
+
+    this.app.vault.off('modify', eventModify)
+    this.app.vault.off('create', eventCreate)
+    this.app.vault.off('delete', eventDelete)
+    this.app.vault.off('rename', eventRename)
 
     console.log('SyncPlugin unloaded')
   }
