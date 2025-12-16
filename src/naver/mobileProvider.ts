@@ -14,7 +14,7 @@ export class NaverMobileProvider implements BaseProviderType {
     this.nidSes = NID_SES
   }
 
-  private async fetch<T>(url: string, options: any): Promise<T> {
+  protected async fetch<T>(url: string, options: any): Promise<T> {
     const body =
       options.method !== 'GET' && options.body
         ? new URLSearchParams(options.body).toString()
@@ -55,6 +55,14 @@ export class NaverMobileProvider implements BaseProviderType {
 
   setGroupId(groupId: string): void {
     this.groupId = parseInt(groupId)
+  }
+
+  async open(): Promise<boolean> {
+    return true
+  }
+
+  async close(): Promise<boolean> {
+    return true
   }
 
   async isReady(): Promise<boolean> {
@@ -102,7 +110,7 @@ export class NaverMobileProvider implements BaseProviderType {
     return groupList
   }
 
-  private async fetchMemoList(cursor: string): Promise<NaverMemoListResponseType> {
+  protected async fetchMemoList(cursor: string): Promise<NaverMemoListResponseType> {
     const url = '/api/memo/select/list'
     const resp: NaverMemoListResponseType = await this.fetch(url, {
       method: 'POST',

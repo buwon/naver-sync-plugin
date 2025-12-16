@@ -1,4 +1,6 @@
 export interface BaseProviderType {
+  open(): Promise<boolean>
+  close(): Promise<boolean>
   isReady(): Promise<boolean>
   fetchGroupList(): Promise<GroupInfoType[]>
   fetchItemList(): Promise<ItemInfoType[]>

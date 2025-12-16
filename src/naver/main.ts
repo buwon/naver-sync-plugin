@@ -1,21 +1,6 @@
-import {
-  App,
-  Editor,
-  MarkdownView,
-  Modal,
-  Notice,
-  Plugin,
-  request,
-  requestUrl,
-  TFile,
-} from 'obsidian'
-import { db } from '../database'
+import { App, Editor, MarkdownView, Modal, Plugin, TFile, setIcon } from 'obsidian'
 import { event } from '../event'
-import { NaverDesktopProvider } from './desktopProvider'
 import { NaverSettingTab, NaverSyncPluginSettings } from './settings'
-import { createRemote } from '../remote'
-import { sync } from '../sync'
-import { createNaverMobileProvider } from './mobileProvider'
 
 function eventCreate(file: TFile) {
   event.emit('create', file)
@@ -38,38 +23,6 @@ export default class NaverSyncPlugin extends Plugin {
 
   async onload() {
     await this.loadSettings()
-
-    this.addCommand({
-      id: 'sync-naver',
-      name: 'start sync',
-      callback: async () => {
-        const provider = NaverDesktopProvider()
-
-        try {
-          const startTime = Date.now()
-          await provider.open()
-          await provider.isReady()
-
-          const groupList = await provider.fetchGroupList()
-          const group = groupList.filter((group) => group.name === this.settings.folderName)
-          if (group.length === 0) {
-            throw new Error('지정한 폴더를 찾을 수 없습니다.')
-          }
-          provider.setGroupId(group[0].id)
-          const remote = createRemote(provider)
-          await sync(this.app.vault, remote)
-          console.log('Sync completed in', Date.now() - startTime, 'ms')
-        } catch (e) {
-          if (e instanceof Error) {
-            console.log('Sync error:', e)
-          }
-          new Notice(e.message)
-          return
-        } finally {
-          await provider.close()
-        }
-      },
-    })
 
     // This creates an icon in the left ribbon.
     const ribbonIconEl = this.addRibbonIcon('dice', 'Sync', (_evt: MouseEvent) => {
@@ -94,10 +47,6 @@ export default class NaverSyncPlugin extends Plugin {
 
     // Perform additional things with the ribbon
     ribbonIconEl.addClass('my-plugin-ribbon-class')
-
-    // This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-    const statusBarItemEl = this.addStatusBarItem()
-    statusBarItemEl.setText('Status Bar Text')
 
     // This adds a simple command that can be triggered anywhere
     this.addCommand({
@@ -136,27 +85,49 @@ export default class NaverSyncPlugin extends Plugin {
       },
     })
 
-    // This adds a settings tab so the user can configure various aspects of the plugin
-    this.addSettingTab(new NaverSettingTab(this.app, this))
-
     // If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
     // Using this function will automatically remove the event listener when this plugin is disabled.
     this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
       // console.log('click', evt)
     })
 
+    this.addCommand({
+      id: 'sync-naver',
+      name: 'start sync',
+      callback: async () => {
+        event.emit('sync', this.settings, this.app.vault)
+      },
+    })
+
+    // This adds a status bar item to the bottom of the app. Does not work on mobile apps.
+    const statusBarItemEl = this.addStatusBarItem()
+    statusBarItemEl.setText('Naver Sync Plugin')
+
+    // This adds a settings tab so the user can configure various aspects of the plugin
+    this.addSettingTab(new NaverSettingTab(this.app, this))
+
     // When registering intervals, this function will automatically clear the interval when the plugin is disabled.
     this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000))
 
-    this.app.vault.on('modify', eventModify)
-    this.app.vault.on('create', eventCreate)
-    this.app.vault.on('delete', eventDelete)
-    this.app.vault.on('rename', eventRename)
+    this.app.workspace.onLayoutReady(() => {
+      this.app.vault.on('modify', eventModify)
+      this.app.vault.on('create', eventCreate)
+      this.app.vault.on('delete', eventDelete)
+      this.app.vault.on('rename', eventRename)
 
-    event.on('saveSettings', async (params: Record<string, any>) => {
-      this.settings = Object.assign({}, this.settings, params)
-      await this.saveData(this.settings)
+      event.on('saveSettings', async (params: Record<string, any>) => {
+        this.settings = Object.assign({}, this.settings, params)
+        await this.saveData(this.settings)
+      })
+
+      event.on('status', (status: string) => {
+        setIcon(statusBarItemEl, `cloud-${status}`)
+      })
     })
+
+    // cloud-alert
+    // cloud-check
+    // cloud-sync
 
     //
     // const resp1 = await requestUrl({
@@ -171,6 +142,7 @@ export default class NaverSyncPlugin extends Plugin {
 
   onunload() {
     event.off('saveSettings')
+    event.off('status')
 
     this.app.vault.off('modify', eventModify)
     this.app.vault.off('create', eventCreate)
@@ -182,7 +154,10 @@ export default class NaverSyncPlugin extends Plugin {
 
   async loadSettings() {
     const DEFAULT_SETTINGS: NaverSyncPluginSettings = {
+      loggedIn: 'no',
       folderName: '내 메모',
+      NID_AUT: '',
+      NID_SES: '',
     }
 
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData())

@@ -1,6 +1,5 @@
 import { TAbstractFile, TFile, Vault } from 'obsidian'
 import { db } from './database'
-import { ItemInfoType } from './types'
 import { Remote } from './remote'
 import { syncState } from './syncState'
 
