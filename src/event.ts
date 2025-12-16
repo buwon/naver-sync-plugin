@@ -1,7 +1,7 @@
 import { TFile } from 'obsidian'
 import { db } from './database'
 import { syncState } from './syncState'
-import { ItemInfoType } from './types'
+import { EventEmitter } from 'eventemitter3'
 
 function getFileInfo(file: TFile) {
   return {
@@ -12,7 +12,7 @@ function getFileInfo(file: TFile) {
   }
 }
 
-export const event = {
+export const event2 = {
   modify: async (file: TFile) => {
     if (syncState.lockFile.has(file.path)) return
 
@@ -41,6 +41,7 @@ export const event = {
       console.log('File created:', file)
     }
   },
+
   delete: async (file: TFile) => {
     if (syncState.lockFile.has(file.path)) return
 
@@ -56,6 +57,7 @@ export const event = {
       console.log('File deleted:', file)
     }
   },
+
   rename: async (file: TFile, oldPath: string) => {
     if (syncState.lockFile.has(oldPath)) return
 
@@ -77,3 +79,71 @@ export const event = {
     console.log('File moved from:', oldPath, 'to:', file.path)
   },
 }
+
+export const event = new EventEmitter()
+
+event.on('create', async (file: TFile) => {
+  if (syncState.lockFile.has(file.path)) return
+
+  if (file instanceof TFile) {
+    const item = {
+      status: 'C',
+      ...getFileInfo(file),
+    }
+
+    db.file.put(item)
+
+    console.log('File created:', file)
+  }
+})
+
+event.on('modify', async (file: TFile) => {
+  if (syncState.lockFile.has(file.path)) return
+
+  if (file instanceof TFile) {
+    const item = {
+      status: 'U',
+      ...getFileInfo(file),
+    }
+
+    db.file.put(item)
+  }
+  console.log('File modified:', file)
+})
+
+event.on('delete', async (file: TFile) => {
+  if (syncState.lockFile.has(file.path)) return
+
+  if (file instanceof TFile) {
+    const item: ItemInfoType = {
+      status: 'D',
+      ...getFileInfo(file),
+      mTime: Date.now(),
+    }
+
+    db.file.put(item)
+
+    console.log('File deleted:', file)
+  }
+})
+
+event.on('rename', async (file: TFile, oldPath: string) => {
+  if (syncState.lockFile.has(oldPath)) return
+
+  if (file instanceof TFile) {
+    const item = {
+      status: 'C',
+      ...getFileInfo(file),
+    }
+    db.file.put(item)
+
+    const oldItem: ItemInfoType = {
+      status: 'D',
+      ...getFileInfo(file),
+      key: oldPath,
+      mTime: Date.now(),
+    }
+    db.file.put(oldItem)
+  }
+  console.log('File moved from:', oldPath, 'to:', file.path)
+})
