@@ -1,10 +1,9 @@
-import { remote } from 'electron'
-
 export class Browser {
   browserWindow = null as Electron.BrowserWindow | null
 
   get browser(): Electron.BrowserWindow {
     if (!this.browserWindow) {
+      const remote = require('electron').remote
       const browserWindow = new remote.BrowserWindow({
         width: 800,
         height: 600,
@@ -34,6 +33,10 @@ export class Browser {
     }
   }
 
+  getURL(): string {
+    return this.webContents.getURL()
+  }
+
   async loadURL(url: string): Promise<void> {
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
@@ -47,6 +50,10 @@ export class Browser {
       this.webContents.once('did-finish-load', resolve)
       this.webContents.loadURL(url).catch(reject)
     })
+  }
+
+  async executeScript(script: string): Promise<any> {
+    return this.webContents.executeJavaScript(script)
   }
 
   async executeMoveScript(script: string, wait: number = 1000): Promise<void> {
