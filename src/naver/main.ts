@@ -1,94 +1,64 @@
-import { App, Editor, MarkdownView, Modal, Plugin, TFile, setIcon } from 'obsidian'
+import { Notice, Plugin, TFile } from 'obsidian'
 import { event } from '../event'
 import { NaverSettingTab, NaverSyncPluginSettings } from './settings'
+import { sync } from '../sync'
+import { createRemote } from '../remote'
+import { createNaverMobileProvider } from './mobileProvider'
+import { createNaverDesktopProvider } from './desktopProvider'
+import { db } from '../database'
 
-function eventCreate(file: TFile) {
-  event.emit('create', file)
-}
-
-function eventModify(file: TFile) {
-  event.emit('modify', file)
-}
-
-function eventDelete(file: TFile) {
-  event.emit('delete', file)
-}
-
-function eventRename(file: TFile, oldPath: string) {
-  event.emit('rename', file, oldPath)
+const local = {
+  lastModifiedTime: 0,
 }
 
 export default class NaverSyncPlugin extends Plugin {
   settings: NaverSyncPluginSettings
 
+  evtCreate(file: TFile) {
+    event.emit('create', file)
+    local.lastModifiedTime = Date.now()
+  }
+
+  evtModify(file: TFile) {
+    event.emit('modify', file)
+    local.lastModifiedTime = Date.now()
+  }
+
+  evtDelete(file: TFile) {
+    event.emit('delete', file)
+    local.lastModifiedTime = Date.now()
+  }
+
+  evtRename(file: TFile, oldPath: string) {
+    event.emit('rename', file, oldPath)
+    local.lastModifiedTime = Date.now()
+  }
+
+  async isIntervalSyncTime() {
+    const settings = this.settings
+    if (0 === settings.syncInterval) return false
+
+    const state = await db.state.get('lastSyncTime')
+    const lastSyncTime = state?.value ?? 0
+
+    return Date.now() - lastSyncTime >= settings.syncInterval
+  }
+
+  isModifiedSyncTime() {
+    const settings = this.settings
+
+    if (0 === settings.onSaveInterval) return false
+    if (0 === local.lastModifiedTime) return false
+
+    return Date.now() - local.lastModifiedTime >= settings.onSaveInterval
+  }
+
   async onload() {
     await this.loadSettings()
 
     // This creates an icon in the left ribbon.
-    const ribbonIconEl = this.addRibbonIcon('dice', 'Sync', (_evt: MouseEvent) => {
-      // Called when the user clicks the icon.
-      // new Notice('This is a notice!')
-      console.log(this.app.vault.getFiles())
-
-      const body = {
-        title: 'Hello World',
-        content: 'This is my first post from Obsidian plugin!',
-      }
-
-      console.log(new URLSearchParams(body).toString())
-    })
-
-    // This creates an icon in the left ribbon.
-    const ribbonIconEl2 = this.addRibbonIcon('cat', 'Close', (_evt: MouseEvent) => {
-      // Called when the user clicks the icon.
-      // new Notice('This is a notice!')
-      // closeBrowser()
-    })
-
-    // Perform additional things with the ribbon
-    ribbonIconEl.addClass('my-plugin-ribbon-class')
-
-    // This adds a simple command that can be triggered anywhere
-    this.addCommand({
-      id: 'open-sample-modal-simple',
-      name: 'Open sample modal (simple)',
-      callback: () => {
-        new SampleModal(this.app).open()
-      },
-    })
-    // This adds an editor command that can perform some operation on the current editor instance
-    this.addCommand({
-      id: 'sample-editor-command',
-      name: 'Sample editor command',
-      editorCallback: (editor: Editor, _view: MarkdownView) => {
-        console.log(editor.getSelection())
-        editor.replaceSelection('Sample Editor Command')
-      },
-    })
-    // This adds a complex command that can check whether the current state of the app allows execution of the command
-    this.addCommand({
-      id: 'open-sample-modal-complex',
-      name: 'Open sample modal (complex)',
-      checkCallback: (checking: boolean) => {
-        // Conditions to check
-        const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView)
-        if (markdownView) {
-          // If checking is true, we're simply "checking" if the command can be run.
-          // If checking is false, then we want to actually perform the operation.
-          if (!checking) {
-            new SampleModal(this.app).open()
-          }
-
-          // This command will only show up in Command Palette when the check function returns true
-          return true
-        }
-      },
-    })
-
-    // If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-    // Using this function will automatically remove the event listener when this plugin is disabled.
-    this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-      // console.log('click', evt)
+    const ribbonIconEl = this.addRibbonIcon('refresh-ccw-dot', 'Naver Sync', (_evt: MouseEvent) => {
+      event.emit('sync', this.settings, this.app.vault)
     })
 
     this.addCommand({
@@ -99,57 +69,98 @@ export default class NaverSyncPlugin extends Plugin {
       },
     })
 
-    // This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-    const statusBarItemEl = this.addStatusBarItem()
-    statusBarItemEl.setText('Naver Sync Plugin')
-
     // This adds a settings tab so the user can configure various aspects of the plugin
     this.addSettingTab(new NaverSettingTab(this.app, this))
 
-    // When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-    this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000))
-
     this.app.workspace.onLayoutReady(() => {
-      this.app.vault.on('modify', eventModify)
-      this.app.vault.on('create', eventCreate)
-      this.app.vault.on('delete', eventDelete)
-      this.app.vault.on('rename', eventRename)
+      local.lastModifiedTime = 0
+      this.app.vault.on('modify', this.evtModify)
+      this.app.vault.on('create', this.evtCreate)
+      this.app.vault.on('delete', this.evtDelete)
+      this.app.vault.on('rename', this.evtRename)
 
       event.on('saveSettings', async (params: Record<string, any>) => {
         this.settings = Object.assign({}, this.settings, params)
         await this.saveData(this.settings)
       })
 
-      event.on('status', (status: string) => {
-        setIcon(statusBarItemEl, `cloud-${status}`)
+      event.on('checkSync', async () => {
+        if (await this.isIntervalSyncTime()) {
+          local.lastModifiedTime = 0
+          event.emit('sync')
+          return
+        }
+
+        if (this.isModifiedSyncTime()) {
+          local.lastModifiedTime = 0
+          event.emit('sync')
+          return
+        }
       })
+
+      event.on('sync', async () => {
+        const settings = this.settings
+        const vault = this.app.vault
+        let provider
+
+        if ('no' === settings.loggedIn) {
+          new Notice('Please log in to Naver before syncing.')
+          return
+        } else if ('mobile' === settings.loggedIn) {
+          const mobileProvider = createNaverMobileProvider()
+          mobileProvider.setCookie(settings.NID_AUT, settings.NID_SES)
+          provider = mobileProvider
+        } else {
+          const desktopProvider = createNaverDesktopProvider()
+          provider = desktopProvider
+        }
+
+        try {
+          const startTime = Date.now()
+          await provider.open()
+          const ready = await provider.isReady()
+          if (!ready) {
+            new Notice('Naver session has expired. Please log in again.')
+            return
+          }
+
+          const groupList = await provider.fetchGroupList()
+          const group = groupList.filter((group) => group.name === settings.folderName)
+          if (group.length === 0) {
+            new Notice('Could not find the specified folder. Please check your settings.')
+            return
+          }
+          provider.setGroupId(group[0].id)
+          const remote = createRemote(provider)
+          await sync(vault, remote)
+          console.log('Sync completed in', Date.now() - startTime, 'ms')
+        } catch (e) {
+          if (e instanceof Error) {
+            console.log('Sync error:', e)
+          }
+          new Notice(e.message)
+          return
+        } finally {
+          await provider.close()
+        }
+      })
+
+      // When registering intervals, this function will automatically clear the interval when the plugin is disabled.
+      this.registerInterval(window.setInterval(() => event.emit('checkSync'), 10 * 1000))
     })
-
-    // cloud-alert
-    // cloud-check
-    // cloud-sync
-
-    //
-    // const resp1 = await requestUrl({
-    //   url: 'https://www.naver.com',
-    //   method: 'GET',
-    //   headers: { cookie: `NID_AUT=${this.settings.NID_AUT}; NID_SES=${this.settings.NID_SES}` },
-    // })
-
-    // const userId = resp1.text.match(/userId: '(.+)'/)[1]
-    // console.log('Naver userId:', userId)
   }
 
   onunload() {
     event.off('saveSettings')
-    event.off('status')
+    event.off('checkSync')
+    event.off('sync')
 
-    this.app.vault.off('modify', eventModify)
-    this.app.vault.off('create', eventCreate)
-    this.app.vault.off('delete', eventDelete)
-    this.app.vault.off('rename', eventRename)
+    this.app.vault.off('modify', this.evtModify)
+    this.app.vault.off('create', this.evtCreate)
+    this.app.vault.off('delete', this.evtDelete)
+    this.app.vault.off('rename', this.evtRename)
 
-    console.log('SyncPlugin unloaded')
+    console.log('NaverSyncPlugin unloaded')
   }
 
   async loadSettings() {
@@ -158,6 +169,8 @@ export default class NaverSyncPlugin extends Plugin {
       folderName: '내 메모',
       NID_AUT: '',
       NID_SES: '',
+      syncInterval: 0,
+      onSaveInterval: 0,
     }
 
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData())
@@ -165,21 +178,5 @@ export default class NaverSyncPlugin extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings)
-  }
-}
-
-class SampleModal extends Modal {
-  constructor(app: App) {
-    super(app)
-  }
-
-  onOpen() {
-    const { contentEl } = this
-    contentEl.setText('Woah!')
-  }
-
-  onClose() {
-    const { contentEl } = this
-    contentEl.empty()
   }
 }

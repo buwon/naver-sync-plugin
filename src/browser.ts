@@ -11,6 +11,7 @@ export class Browser {
           nodeIntegration: false,
           contextIsolation: true,
         },
+        show: false,
       })
       browserWindow.once('close', () => {
         this.browserWindow = null

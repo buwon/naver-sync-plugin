@@ -1,5 +1,4 @@
 import { Dexie, EntityTable } from 'dexie'
-import { ItemInfoType } from './types'
 
 interface State {
   key: string

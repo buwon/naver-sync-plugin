@@ -17,6 +17,8 @@ export interface NaverSyncPluginSettings {
   folderName: string
   NID_AUT: string
   NID_SES: string
+  syncInterval: number
+  onSaveInterval: number
 }
 
 export class NaverSettingTab extends PluginSettingTab {
@@ -122,6 +124,13 @@ export class NaverSettingTab extends PluginSettingTab {
       .login({ id: this.state.id, password: this.state.password, captcha: this.state.captcha })
       .catch(() => false)
 
+    this.state.idInput?.setDisabled(false)
+    this.state.pwInput?.setDisabled(false)
+    this.state.pwInput?.setValue('')
+    this.state.captchaInput?.setDisabled(false)
+    this.state.loginButton?.setButtonText('Login')
+    this.state.loginButton?.setDisabled(false)
+
     if (success) {
       this.display()
     } else {
@@ -133,11 +142,6 @@ export class NaverSettingTab extends PluginSettingTab {
       } else {
         this.state.description?.setDesc('로그인에 실패했습니다. 아이디와 패스워드를 확인해주세요.')
       }
-      this.state.idInput?.setDisabled(false)
-      this.state.pwInput?.setDisabled(false)
-      this.state.captchaInput?.setDisabled(false)
-      this.state.loginButton?.setButtonText('Login')
-      this.state.loginButton?.setDisabled(false)
     }
 
     return success
@@ -344,6 +348,44 @@ export class NaverSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings()
           }),
       )
+
+    new Setting(this.containerEl)
+      .setName('Schedule For Auto Run')
+      .setDesc('The plugin tries to schedule the running after every interval.')
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOptions({
+            0: '(not set)',
+            300000: 'Every 5 minutes',
+            600000: 'Every 10 minutes',
+            1800000: 'Every 30 minutes',
+            3600000: 'Every 1 hour',
+          })
+          .setValue(this.plugin.settings.syncInterval.toString())
+          .onChange(async (value) => {
+            const interval = parseInt(value)
+            event.emit('saveSettings', { syncInterval: interval })
+          })
+      })
+
+    new Setting(this.containerEl)
+      .setName('Sync On Save')
+      .setDesc('If you change your files, the plugin tries to sync after this time')
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOptions({
+            0: '(not set)',
+            60000: 'Every 1 minutes',
+            180000: 'Every 3 minutes',
+            300000: 'Every 5 minutes',
+            600000: 'Every 10 minutes',
+          })
+          .setValue(this.plugin.settings.onSaveInterval.toString())
+          .onChange(async (value) => {
+            const interval = parseInt(value)
+            event.emit('saveSettings', { onSaveInterval: interval })
+          })
+      })
   }
 
   hide(): void {

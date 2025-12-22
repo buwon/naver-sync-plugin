@@ -2,6 +2,26 @@ import { requestUrl, RequestUrlParam } from 'obsidian'
 import { BaseProviderType } from '../base'
 import { event } from '../event'
 
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer)
+  const chunkSize = 0x8000
+  let binary = ''
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+  }
+  return btoa(binary)
+}
+
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binary = atob(base64)
+  const len = binary.length
+  const bytes = new Uint8Array(len)
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return bytes.buffer
+}
+
 export class NaverMobileProvider implements BaseProviderType {
   userId: string | null = null
   nidAut: string | null = null
@@ -38,19 +58,12 @@ export class NaverMobileProvider implements BaseProviderType {
       body,
     }
 
-    console.log('NaverMobileProvider request:', request)
-
-    return requestUrl(request)
-      .then((resp) => {
-        console.log('NaverMobileProvider response:', resp)
-        return resp
-      })
-      .then((resp) => {
-        if (resp.json instanceof Error) {
-          throw resp.json
-        }
-        return resp.json
-      })
+    return requestUrl(request).then((resp) => {
+      if (resp.json instanceof Error) {
+        throw resp.json
+      }
+      return resp.json
+    })
   }
 
   setGroupId(groupId: string): void {
@@ -219,7 +232,7 @@ export class NaverMobileProvider implements BaseProviderType {
   async downloadFile(key: string): Promise<ArrayBuffer | null> {
     const item = await this.fetchItemInfo(key)
     if (item?.content) {
-      return Buffer.from(item.content, 'base64').buffer
+      return base64ToArrayBuffer(item.content)
     }
     return null
   }
@@ -256,7 +269,7 @@ export class NaverMobileProvider implements BaseProviderType {
     }
 
     const memo = this.memos[item.key]
-    const content = Buffer.from(data).toString('base64')
+    const content = arrayBufferToBase64(data)
     const memoContent = `${item.mTime};${item.cTime};N;${item.size};${content};`
 
     const url = '/memo/updateMemo'

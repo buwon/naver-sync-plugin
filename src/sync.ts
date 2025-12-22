@@ -2,6 +2,7 @@ import { TAbstractFile, TFile, Vault } from 'obsidian'
 import { db } from './database'
 import { Remote } from './remote'
 import { syncState } from './syncState'
+import { event } from './event'
 
 function getFileByPath(vault: Vault, path: string): TFile | null {
   const file: TAbstractFile | null = vault.getAbstractFileByPath(path)
@@ -19,7 +20,7 @@ export async function sync(vault: Vault, remote: Remote) {
   syncState.isSyncing = true
 
   // update sync start time
-  await db.state.put({ key: 'lastSyncTime', value: Date.now() })
+  event.emit('updateLastSyncTime')
 
   // load local db files
   const files = new Map<string, ItemInfoType>()
@@ -127,6 +128,6 @@ export async function sync(vault: Vault, remote: Remote) {
   await Promise.all(uploadPromises)
 
   // update last sync time
-  await db.state.put({ key: 'lastSyncTime', value: Date.now() })
+  event.emit('updateLastSyncTime')
   syncState.reset()
 }

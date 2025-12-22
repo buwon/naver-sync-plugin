@@ -1,5 +1,4 @@
 import { BaseProviderType } from './base'
-import { GroupInfoType, ItemInfoType } from './types'
 
 export class Remote {
   provider: BaseProviderType
