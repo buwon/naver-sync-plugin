@@ -1,13 +1,15 @@
 {
 	"name": "naver-sync-plugin",
 	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"description": "An Obsidian plugin to sync notes with Naver service",
 	"main": "dist/main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"watch": "node esbuild.config.mjs",
-		"watch:naver": "bun build src/naver/main.ts --outfile=main.js --bundle --watch --target node --format cjs --external obsidian --external electron",
-		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"watch:naver": "bun run build:plugin -- --outfile=main.js --watch",
+		"build": "bun run build:plugin -- --outfile=dist/main.js && bun run build:manifest",
+		"build:plugin": "bun build src/naver/main.ts --bundle --target node --format cjs --external obsidian --external electron",
+		"build:manifest": "bun run scripts/manifest.ts",
 		"version": "node version-bump.mjs && git add manifest.json versions.json"
 	},
 	"keywords": [],
