@@ -27,7 +27,10 @@ export async function generateObsidianPluginManifest() {
     isDesktopOnly: false,
   } satisfies ObsidianPluginManifest
 
-  await writeFile(join(cwd(), 'dist', 'manifest.json'), JSON.stringify(manifest, null, 2))
+  const text = JSON.stringify(manifest, null, 2)
+
+  await writeFile(join(cwd(), 'dist', 'manifest.json'), text)
+  await writeFile(join(cwd(), 'manifest.json'), text)
 }
 
 generateObsidianPluginManifest().catch((error) => {

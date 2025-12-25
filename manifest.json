@@ -1,0 +1,10 @@
+{
+  "id": "naver-sync-plugin",
+  "name": "NAVER Sync",
+  "version": "1.0.0",
+  "minAppVersion": "1.4.0",
+  "description": "Sync your Obsidian notes with NAVER memo service.",
+  "author": "Buwon Lee",
+  "authorUrl": "https://github.com/buwon/naver-sync-plugin",
+  "isDesktopOnly": false
+}
