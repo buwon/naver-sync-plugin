@@ -21,7 +21,7 @@ export async function generateObsidianPluginManifest() {
     name: 'NAVER Sync',
     version: packageJSON.version,
     minAppVersion: '1.4.0',
-    description: 'Sync your vault with NAVER memo service',
+    description: packageJSON.description,
     author: 'Buwon Lee',
     authorUrl: 'https://github.com/buwon',
     isDesktopOnly: false,

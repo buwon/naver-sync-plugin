@@ -3,7 +3,7 @@
   "name": "NAVER Sync",
   "version": "1.0.0",
   "minAppVersion": "1.4.0",
-  "description": "Sync your vault with NAVER memo service",
+  "description": "Sync your vault with NAVER memo service.",
   "author": "Buwon Lee",
   "authorUrl": "https://github.com/buwon",
   "isDesktopOnly": false
