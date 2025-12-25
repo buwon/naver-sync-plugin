@@ -24,8 +24,6 @@ event.on('create', async (file: TFile) => {
     }
 
     db.file.put(item)
-
-    console.log('File created:', file)
   }
 })
 
@@ -40,7 +38,6 @@ event.on('modify', async (file: TFile) => {
 
     db.file.put(item)
   }
-  console.log('File modified:', file)
 })
 
 event.on('delete', async (file: TFile) => {
@@ -54,8 +51,6 @@ event.on('delete', async (file: TFile) => {
     }
 
     db.file.put(item)
-
-    console.log('File deleted:', file)
   }
 })
 
@@ -77,7 +72,6 @@ event.on('rename', async (file: TFile, oldPath: string) => {
     }
     db.file.put(oldItem)
   }
-  console.log('File moved from:', oldPath, 'to:', file.path)
 })
 
 event.on('updateLastSyncTime', async () => {
