@@ -84,8 +84,9 @@ export async function sync(vault: Vault, remote: Remote) {
         return
       } else {
         const content = await remote.downloadFile(key)
-        if (!vault.getFolderByPath(key.substring(0, key.lastIndexOf('/')))) {
-          await vault.createFolder(key.substring(0, key.lastIndexOf('/')))
+        const folderPath = key.substring(0, key.lastIndexOf('/'))
+        if (!vault.getFolderByPath(folderPath)) {
+          await vault.createFolder(folderPath).catch(() => {})
         }
         if (content) {
           syncState.lockFile.add(key)
