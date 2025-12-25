@@ -18,10 +18,10 @@ interface ObsidianPluginManifest {
 export async function generateObsidianPluginManifest() {
   const manifest = {
     id: 'naver-sync-plugin',
-    name: 'Naver Sync',
+    name: 'NAVER Sync',
     version: packageJSON.version,
     minAppVersion: '1.4.0',
-    description: 'Sync your Obsidian notes with Naver Memo service.',
+    description: 'Sync your Obsidian notes with NAVER memo service.',
     author: 'Buwon Lee',
     authorUrl: 'https://github.com/buwon/naver-sync-plugin',
     isDesktopOnly: false,
