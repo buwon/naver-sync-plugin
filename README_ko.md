@@ -1,5 +1,7 @@
 # NAVER Sync
 
+[English](./README.md) | 한국어
+
 Obsidian의 문서와 파일을 NAVER의 메모 서비스를 이용해서 동기화하는 플러그인입니다.
 
 ## 기능

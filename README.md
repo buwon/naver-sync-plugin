@@ -1,5 +1,7 @@
 # NAVER Sync
 
+English | [한국어](./README_ko.md)
+
 This plugin synchronizes documents and files in Obsidian using Naver's memo service.
 
 ## Features
@@ -35,4 +37,3 @@ This plugin synchronizes documents and files in Obsidian using Naver's memo serv
 ## Feedback
 
 Please report bugs and request features on GitHub Issues.
-
