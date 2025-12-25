@@ -1,7 +1,7 @@
 {
 	"name": "naver-sync-plugin",
 	"version": "1.0.0",
-	"description": "An Obsidian plugin to sync notes with NAVER service",
+	"description": "Sync your vault with NAVER memo service",
 	"main": "dist/main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
