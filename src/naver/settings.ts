@@ -136,7 +136,7 @@ export class NaverSettingTab extends PluginSettingTab {
     } else {
       const captchaSrc = await desktopProvider
         .web()
-        .executeJavaScript('document.querySelector("img#captchaimg").src')
+        .executeJavaScript<string>('document.querySelector("img#captchaimg").src')
       if (captchaSrc) {
         await this.displayCaptcha(captchaSrc)
       } else {
@@ -286,7 +286,7 @@ export class NaverSettingTab extends PluginSettingTab {
       this.state.captchaDiv.createEl('img', { attr: { src: captchaSrc } })
       const info = await this.desktopProvider
         .web()
-        .executeJavaScript('document.querySelector("p#captcha_info").innerText')
+        .executeJavaScript<string>('document.querySelector("p#captcha_info").innerText')
 
       new Setting(this.state.captchaDiv).setName(info).addText((text) => {
         this.state.captchaInput = text
