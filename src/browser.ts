@@ -3,7 +3,7 @@ export class Browser {
 
   get browser(): Electron.BrowserWindow {
     if (!this.browserWindow) {
-      const remote = require('electron').remote
+      const remote = window.require('electron').remote
       const browserWindow = new remote.BrowserWindow({
         width: 800,
         height: 600,
@@ -53,7 +53,7 @@ export class Browser {
     })
   }
 
-  async executeScript(script: string): Promise<any> {
+  async executeScript(script: string): Promise<void> {
     return this.webContents.executeJavaScript(script)
   }
 
@@ -65,4 +65,8 @@ export class Browser {
         .catch(reject)
     })
   }
+}
+
+export function createBrowser() {
+  return new Browser()
 }

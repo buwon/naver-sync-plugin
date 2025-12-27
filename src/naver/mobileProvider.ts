@@ -34,10 +34,10 @@ export class NaverMobileProvider implements BaseProviderType {
     this.nidSes = NID_SES
   }
 
-  protected async fetch<T>(url: string, options: any): Promise<T> {
+  protected async fetch<T>(url: string, options: FetchOptionType): Promise<T> {
     const body =
       options.method !== 'GET' && options.body
-        ? new URLSearchParams(options.body).toString()
+        ? new URLSearchParams(options.body as Record<string, string>).toString()
         : undefined
 
     const contentType =
@@ -70,12 +70,12 @@ export class NaverMobileProvider implements BaseProviderType {
     this.groupId = parseInt(groupId)
   }
 
-  async open(): Promise<boolean> {
-    return true
+  open(): Promise<boolean> {
+    return Promise.resolve(true)
   }
 
-  async close(): Promise<boolean> {
-    return true
+  close(): Promise<boolean> {
+    return Promise.resolve(true)
   }
 
   async isReady(): Promise<boolean> {

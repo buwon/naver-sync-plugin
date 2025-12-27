@@ -54,7 +54,7 @@ export class NaverSettingTab extends PluginSettingTab {
     this.mobileProvider = createNaverMobileProvider()
   }
 
-  async setLoggedInNaver(mode: 'desktop' | 'mobile' | 'no') {
+  setLoggedInNaver(mode: 'desktop' | 'mobile' | 'no') {
     if (this.plugin.settings.loggedIn === mode) {
       return
     }
@@ -69,7 +69,7 @@ export class NaverSettingTab extends PluginSettingTab {
       await desktopProvider.open()
       const success = await desktopProvider.isReady()
       if (success) {
-        await this.setLoggedInNaver('desktop')
+        this.setLoggedInNaver('desktop')
 
         this.desktopProvider = desktopProvider
         return true
@@ -83,12 +83,12 @@ export class NaverSettingTab extends PluginSettingTab {
 
       const success = await this.mobileProvider.isReady()
       if (success) {
-        await this.setLoggedInNaver('mobile')
+        this.setLoggedInNaver('mobile')
         return true
       }
     }
 
-    await this.setLoggedInNaver('no')
+    this.setLoggedInNaver('no')
     return false
   }
 
@@ -97,7 +97,7 @@ export class NaverSettingTab extends PluginSettingTab {
       const desktopProvider = this.desktopProvider
       if (desktopProvider) {
         const groupList = await desktopProvider.fetchGroupList()
-        desktopProvider.close()
+        await desktopProvider.close()
         return groupList
       }
     }
@@ -132,13 +132,13 @@ export class NaverSettingTab extends PluginSettingTab {
     this.state.loginButton?.setDisabled(false)
 
     if (success) {
-      this.display()
+      await this.display()
     } else {
       const captchaSrc = await desktopProvider
         .web()
         .executeJavaScript('document.querySelector("img#captchaimg").src')
       if (captchaSrc) {
-        this.displayCaptcha(captchaSrc)
+        await this.displayCaptcha(captchaSrc)
       } else {
         this.state.description?.setDesc('로그인에 실패했습니다. 아이디와 패스워드를 확인해주세요.')
       }
@@ -164,13 +164,13 @@ export class NaverSettingTab extends PluginSettingTab {
     new Setting(this.containerEl).setDesc('플러그인은 패스워드를 저장하지 않습니다.')
 
     // 패스워드 로그인 섹션
-    new Setting(this.containerEl).setName('ID & Password').setHeading()
+    new Setting(this.containerEl).setName('Password').setHeading()
 
     this.state.description = new Setting(this.containerEl)
       .setName('ID')
       .addText((text) => {
         this.state.idInput = text
-        return text.setPlaceholder('Naver ID').onChange((value) => (this.state.id = value))
+        return text.setPlaceholder('ID').onChange((value) => (this.state.id = value))
       })
       .addText((text) => {
         this.state.pwInput = text
@@ -179,13 +179,11 @@ export class NaverSettingTab extends PluginSettingTab {
         text.inputEl.addEventListener('keydown', (event) => {
           if (event.key === 'Enter') {
             event.preventDefault()
-            this.onClickPasswordLogin()
+            void this.onClickPasswordLogin()
           }
         })
 
-        return text
-          .setPlaceholder('Naver Password')
-          .onChange((value) => (this.state.password = value))
+        return text.setPlaceholder('Password').onChange((value) => (this.state.password = value))
       })
       .addButton((button) => {
         this.state.loginButton = button
@@ -194,7 +192,7 @@ export class NaverSettingTab extends PluginSettingTab {
 
     this.state.captchaDiv = this.containerEl.createEl('div')
 
-    new Setting(this.containerEl).setName('One-time Number').setHeading()
+    new Setting(this.containerEl).setName('One-time number').setHeading()
 
     new Setting(this.containerEl)
       .setName('일회용 번호')
@@ -214,7 +212,7 @@ export class NaverSettingTab extends PluginSettingTab {
           button.setDisabled(true)
           const success = await this.onClickOneTimeLogin()
           if (success) {
-            this.display()
+            await this.display()
           } else {
             this.state.description?.setDesc('일회용 로그인 번호를 확인한 후 다시 입력해 주세요.')
             this.state.oneTimeInput?.setValue('')
@@ -228,13 +226,13 @@ export class NaverSettingTab extends PluginSettingTab {
 
   displayMobileLoginSetting() {
     // 쿠키 로그인 섹션
-    new Setting(this.containerEl).setName('Cookie Login').setHeading()
+    new Setting(this.containerEl).setName('Cookie login').setHeading()
 
     new Setting(this.containerEl).setName('NID_AUT').addText((text) => {
       return text
         .setPlaceholder('NID_AUT')
         .setValue(this.plugin.settings.NID_AUT)
-        .onChange(async (value) => {
+        .onChange((value) => {
           this.plugin.settings.NID_AUT = value
           event.emit('saveSettings', { NID_AUT: value })
         })
@@ -244,7 +242,7 @@ export class NaverSettingTab extends PluginSettingTab {
       return text
         .setPlaceholder('NID_SES')
         .setValue(this.plugin.settings.NID_SES)
-        .onChange(async (value) => {
+        .onChange((value) => {
           this.plugin.settings.NID_SES = value
           event.emit('saveSettings', { NID_SES: value })
         })
@@ -260,7 +258,7 @@ export class NaverSettingTab extends PluginSettingTab {
           this.mobileProvider.setCookie(this.plugin.settings.NID_AUT, this.plugin.settings.NID_SES)
           const success = await this.mobileProvider.isReady()
           if (success) {
-            this.display()
+            void this.display()
           } else {
             new Notice('쿠키 로그인에 실패했습니다. 쿠키 값을 확인해 주세요.')
             button.setButtonText('Login')
@@ -271,13 +269,13 @@ export class NaverSettingTab extends PluginSettingTab {
   }
 
   displayLogoutSetting() {
-    new Setting(this.containerEl).setName('Logged in Naver').addButton((button) => {
+    new Setting(this.containerEl).setName('Logged in naver').addButton((button) => {
       button.setButtonText('Logout').onClick(async () => {
         if (this.desktopProvider) {
           await this.desktopProvider.logout()
         }
         event.emit('saveSettings', { loggedIn: 'no', NID_AUT: '', NID_SES: '' })
-        this.display()
+        void this.display()
       })
     })
   }
@@ -295,7 +293,7 @@ export class NaverSettingTab extends PluginSettingTab {
         text.inputEl.addEventListener('keydown', (event) => {
           if (event.key === 'Enter') {
             event.preventDefault()
-            this.onClickPasswordLogin()
+            void this.onClickPasswordLogin()
           }
         })
         return text
@@ -312,10 +310,10 @@ export class NaverSettingTab extends PluginSettingTab {
     this.state.oneTime = ''
   }
 
-  async display() {
+  async displayAsync() {
     this.clear()
 
-    this.containerEl.createEl('h3', { text: 'Naver Account Settings' })
+    new Setting(this.containerEl).setName('Naver session').setHeading()
 
     const ready = await this.isLoggedInNaver()
     if (ready) {
@@ -334,11 +332,11 @@ export class NaverSettingTab extends PluginSettingTab {
       this.displayMobileLoginSetting()
     }
 
-    this.containerEl.createEl('h3', { text: 'Naver Sync Settings' })
+    new Setting(this.containerEl).setName('Sync options').setHeading()
 
     new Setting(this.containerEl)
       .setName('폴더 이름')
-      .setDesc('동기화할 Naver 메모 폴더 이름을 설정합니다.')
+      .setDesc('동기화할 네이버 메모 폴더 이름을 설정합니다.')
       .addDropdown((dropdown) =>
         dropdown
           .addOptions(this.groupList)
@@ -350,7 +348,7 @@ export class NaverSettingTab extends PluginSettingTab {
       )
 
     new Setting(this.containerEl)
-      .setName('Schedule For Auto Run')
+      .setName('Schedule for auto run')
       .setDesc('The plugin tries to schedule the running after every interval.')
       .addDropdown((dropdown) => {
         dropdown
@@ -362,14 +360,14 @@ export class NaverSettingTab extends PluginSettingTab {
             3600000: 'Every 1 hour',
           })
           .setValue(this.plugin.settings.syncInterval.toString())
-          .onChange(async (value) => {
+          .onChange((value) => {
             const interval = parseInt(value)
             event.emit('saveSettings', { syncInterval: interval })
           })
       })
 
     new Setting(this.containerEl)
-      .setName('Sync On Save')
+      .setName('Sync on save')
       .setDesc('If you change your files, the plugin tries to sync after this time')
       .addDropdown((dropdown) => {
         dropdown
@@ -381,16 +379,20 @@ export class NaverSettingTab extends PluginSettingTab {
             600000: 'Every 10 minutes',
           })
           .setValue(this.plugin.settings.onSaveInterval.toString())
-          .onChange(async (value) => {
+          .onChange((value) => {
             const interval = parseInt(value)
             event.emit('saveSettings', { onSaveInterval: interval })
           })
       })
   }
 
+  display() {
+    void this.displayAsync()
+  }
+
   hide(): void {
     if (this.desktopProvider) {
-      this.desktopProvider.close()
+      void this.desktopProvider.close()
     }
 
     this.clear()

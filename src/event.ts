@@ -14,7 +14,7 @@ function getFileInfo(file: TFile) {
 
 export const event = new EventEmitter()
 
-event.on('create', async (file: TFile) => {
+event.on('create', (file: TFile) => {
   if (syncState.lockFile.has(file.path)) return
 
   if (file instanceof TFile) {
@@ -23,11 +23,11 @@ event.on('create', async (file: TFile) => {
       ...getFileInfo(file),
     }
 
-    db.file.put(item)
+    void db.file.put(item)
   }
 })
 
-event.on('modify', async (file: TFile) => {
+event.on('modify', (file: TFile) => {
   if (syncState.lockFile.has(file.path)) return
 
   if (file instanceof TFile) {
@@ -36,11 +36,11 @@ event.on('modify', async (file: TFile) => {
       ...getFileInfo(file),
     }
 
-    db.file.put(item)
+    void db.file.put(item)
   }
 })
 
-event.on('delete', async (file: TFile) => {
+event.on('delete', (file: TFile) => {
   if (syncState.lockFile.has(file.path)) return
 
   if (file instanceof TFile) {
@@ -50,11 +50,11 @@ event.on('delete', async (file: TFile) => {
       mTime: Date.now(),
     }
 
-    db.file.put(item)
+    void db.file.put(item)
   }
 })
 
-event.on('rename', async (file: TFile, oldPath: string) => {
+event.on('rename', (file: TFile, oldPath: string) => {
   if (syncState.lockFile.has(oldPath)) return
 
   if (file instanceof TFile) {
@@ -62,7 +62,7 @@ event.on('rename', async (file: TFile, oldPath: string) => {
       status: 'C',
       ...getFileInfo(file),
     }
-    db.file.put(item)
+    void db.file.put(item)
 
     const oldItem: ItemInfoType = {
       status: 'D',
@@ -70,11 +70,11 @@ event.on('rename', async (file: TFile, oldPath: string) => {
       key: oldPath,
       mTime: Date.now(),
     }
-    db.file.put(oldItem)
+    void db.file.put(oldItem)
   }
 })
 
-event.on('updateLastSyncTime', async () => {
+event.on('updateLastSyncTime', () => {
   // update sync start time
-  await db.state.put({ key: 'lastSyncTime', value: Date.now() })
+  void db.state.put({ key: 'lastSyncTime', value: Date.now() })
 })

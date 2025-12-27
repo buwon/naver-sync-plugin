@@ -1,4 +1,4 @@
-import { TAbstractFile, TFile, Vault } from 'obsidian'
+import { FileManager, TAbstractFile, TFile, Vault } from 'obsidian'
 import { db } from './database'
 import { Remote } from './remote'
 import { syncState } from './syncState'
@@ -13,7 +13,7 @@ function getFileByPath(vault: Vault, path: string): TFile | null {
   return null
 }
 
-export async function sync(vault: Vault, remote: Remote) {
+export async function sync(vault: Vault, remote: Remote, fileManager: FileManager) {
   if (syncState.isSyncing) {
     return
   }
@@ -66,7 +66,7 @@ export async function sync(vault: Vault, remote: Remote) {
       }
       if ('D' === remoteItem.status) {
         syncState.lockFile.add(key)
-        await vault.delete(file)
+        await fileManager.trashFile(file)
         syncState.lockFile.delete(key)
       } else {
         const content = await remote.downloadFile(key)

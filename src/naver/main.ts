@@ -14,26 +14,6 @@ const local = {
 export default class NaverSyncPlugin extends Plugin {
   settings: NaverSyncPluginSettings
 
-  evtCreate(file: TFile) {
-    event.emit('create', file)
-    local.lastModifiedTime = Date.now()
-  }
-
-  evtModify(file: TFile) {
-    event.emit('modify', file)
-    local.lastModifiedTime = Date.now()
-  }
-
-  evtDelete(file: TFile) {
-    event.emit('delete', file)
-    local.lastModifiedTime = Date.now()
-  }
-
-  evtRename(file: TFile, oldPath: string) {
-    event.emit('rename', file, oldPath)
-    local.lastModifiedTime = Date.now()
-  }
-
   async isIntervalSyncTime() {
     const settings = this.settings
     if (0 === settings.syncInterval) return false
@@ -53,20 +33,79 @@ export default class NaverSyncPlugin extends Plugin {
     return Date.now() - local.lastModifiedTime >= settings.onSaveInterval
   }
 
+  async checkSync() {
+    if (await this.isIntervalSyncTime()) {
+      local.lastModifiedTime = 0
+      await this.sync()
+      return
+    }
+
+    if (this.isModifiedSyncTime()) {
+      local.lastModifiedTime = 0
+      await this.sync()
+      return
+    }
+  }
+
+  async sync() {
+    const settings = this.settings
+    const vault = this.app.vault
+    let provider
+
+    if ('no' === settings.loggedIn) {
+      new Notice('Please log in to naver before syncing.')
+      return
+    } else if ('mobile' === settings.loggedIn) {
+      const mobileProvider = createNaverMobileProvider()
+      mobileProvider.setCookie(settings.NID_AUT, settings.NID_SES)
+      provider = mobileProvider
+    } else {
+      const desktopProvider = createNaverDesktopProvider()
+      provider = desktopProvider
+    }
+
+    try {
+      const startTime = Date.now()
+      await provider.open()
+      const ready = await provider.isReady()
+      if (!ready) {
+        new Notice('Naver session has expired. Please log in again.')
+        return
+      }
+
+      const groupList = await provider.fetchGroupList()
+      const group = groupList.filter((group) => group.name === settings.folderName)
+      if (group.length === 0) {
+        new Notice('Could not find the specified folder. Please check your settings.')
+        return
+      }
+      provider.setGroupId(group[0].id)
+      const remote = createRemote(provider)
+      await sync(vault, remote, this.app.fileManager)
+      console.debug('Sync completed in', Date.now() - startTime, 'ms')
+    } catch (e) {
+      if (e instanceof Error) {
+        console.error('Sync error:', e)
+      }
+      new Notice(e.message)
+      return
+    } finally {
+      void provider.close()
+    }
+  }
+
   async onload() {
     await this.loadSettings()
 
     // This creates an icon in the left ribbon.
-    const ribbonIconEl = this.addRibbonIcon('refresh-ccw-dot', 'Naver Sync', (_evt: MouseEvent) => {
-      event.emit('sync', this.settings, this.app.vault)
+    this.addRibbonIcon('refresh-ccw-dot', 'Sync with naver', (_evt: MouseEvent) => {
+      void this.sync()
     })
 
     this.addCommand({
       id: 'sync-naver',
-      name: 'start sync',
-      callback: async () => {
-        event.emit('sync', this.settings, this.app.vault)
-      },
+      name: 'Start sync',
+      callback: () => void this.sync(),
     })
 
     // This adds a settings tab so the user can configure various aspects of the plugin
@@ -74,93 +113,50 @@ export default class NaverSyncPlugin extends Plugin {
 
     this.app.workspace.onLayoutReady(() => {
       local.lastModifiedTime = 0
-      this.app.vault.on('modify', this.evtModify)
-      this.app.vault.on('create', this.evtCreate)
-      this.app.vault.on('delete', this.evtDelete)
-      this.app.vault.on('rename', this.evtRename)
 
-      event.on('saveSettings', async (params: Record<string, any>) => {
+      this.registerEvent(
+        this.app.vault.on('create', (file: TFile) => {
+          event.emit('create', file)
+          local.lastModifiedTime = Date.now()
+        }),
+      )
+
+      this.registerEvent(
+        this.app.vault.on('modify', (file: TFile) => {
+          event.emit('modify', file)
+          local.lastModifiedTime = Date.now()
+        }),
+      )
+
+      this.registerEvent(
+        this.app.vault.on('delete', (file: TFile) => {
+          event.emit('delete', file)
+          local.lastModifiedTime = Date.now()
+        }),
+      )
+      this.registerEvent(
+        this.app.vault.on('rename', (file: TFile, oldPath: string) => {
+          event.emit('rename', file, oldPath)
+          local.lastModifiedTime = Date.now()
+        }),
+      )
+
+      event.on('saveSettings', (params: Record<string, string | number>) => {
         this.settings = Object.assign({}, this.settings, params)
-        await this.saveData(this.settings)
-      })
-
-      event.on('checkSync', async () => {
-        if (await this.isIntervalSyncTime()) {
-          local.lastModifiedTime = 0
-          event.emit('sync')
-          return
-        }
-
-        if (this.isModifiedSyncTime()) {
-          local.lastModifiedTime = 0
-          event.emit('sync')
-          return
-        }
-      })
-
-      event.on('sync', async () => {
-        const settings = this.settings
-        const vault = this.app.vault
-        let provider
-
-        if ('no' === settings.loggedIn) {
-          new Notice('Please log in to Naver before syncing.')
-          return
-        } else if ('mobile' === settings.loggedIn) {
-          const mobileProvider = createNaverMobileProvider()
-          mobileProvider.setCookie(settings.NID_AUT, settings.NID_SES)
-          provider = mobileProvider
-        } else {
-          const desktopProvider = createNaverDesktopProvider()
-          provider = desktopProvider
-        }
-
-        try {
-          const startTime = Date.now()
-          await provider.open()
-          const ready = await provider.isReady()
-          if (!ready) {
-            new Notice('Naver session has expired. Please log in again.')
-            return
-          }
-
-          const groupList = await provider.fetchGroupList()
-          const group = groupList.filter((group) => group.name === settings.folderName)
-          if (group.length === 0) {
-            new Notice('Could not find the specified folder. Please check your settings.')
-            return
-          }
-          provider.setGroupId(group[0].id)
-          const remote = createRemote(provider)
-          await sync(vault, remote)
-          console.log('Sync completed in', Date.now() - startTime, 'ms')
-        } catch (e) {
-          if (e instanceof Error) {
-            console.log('Sync error:', e)
-          }
-          new Notice(e.message)
-          return
-        } finally {
-          await provider.close()
-        }
+        void this.saveData(this.settings)
       })
 
       // When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-      this.registerInterval(window.setInterval(() => event.emit('checkSync'), 10 * 1000))
+      this.registerInterval(window.setInterval(() => void this.checkSync(), 10 * 1000))
+
+      console.debug('NaverSyncPlugin loaded')
     })
   }
 
   onunload() {
     event.off('saveSettings')
-    event.off('checkSync')
-    event.off('sync')
 
-    this.app.vault.off('modify', this.evtModify)
-    this.app.vault.off('create', this.evtCreate)
-    this.app.vault.off('delete', this.evtDelete)
-    this.app.vault.off('rename', this.evtRename)
-
-    console.log('NaverSyncPlugin unloaded')
+    console.debug('NaverSyncPlugin unloaded')
   }
 
   async loadSettings() {

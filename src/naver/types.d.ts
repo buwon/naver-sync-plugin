@@ -35,7 +35,7 @@ interface NaverMemoType {
   content: string
   memoPlainContent: string
   shortVersion: boolean
-  images: any[]
+  images: string[]
   createdTime: number
   lastModifiedTime: number
   clientType: string
@@ -54,15 +54,15 @@ interface NaverMemoType {
   modifyDate: string
   memoContent: string
   registerDate: string
-  imgList: any[]
+  imgList: string[]
   clientTypeCode: number
   registDate: string
   lastModifyDate: string
-  imageList: any[]
-  audioList: any[]
-  openGraphList: any[]
+  imageList: string[]
+  audioList: string[]
+  openGraphList: string[]
   existsAudio: boolean
-  comments: any[]
+  comments: string[]
 }
 
 interface NaverMemoListResponseType {
@@ -79,4 +79,13 @@ interface NaverMemoResponseType {
   code: 'FAIL' | 'SUCCESS'
   message: string
   data: NaverMemoType
+}
+
+interface FetchOptionType {
+  /** @public */
+  method?: string
+  /** @public */
+  body?: Record<string, string | number | boolean>
+  /** @public */
+  headers?: Record<string, string>
 }
