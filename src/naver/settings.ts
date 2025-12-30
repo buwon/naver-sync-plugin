@@ -132,7 +132,7 @@ export class NaverSettingTab extends PluginSettingTab {
     this.state.loginButton?.setDisabled(false)
 
     if (success) {
-      await this.display()
+      this.display()
     } else {
       const captchaSrc = await desktopProvider
         .web()
@@ -164,10 +164,10 @@ export class NaverSettingTab extends PluginSettingTab {
     new Setting(this.containerEl).setDesc('플러그인은 패스워드를 저장하지 않습니다.')
 
     // 패스워드 로그인 섹션
-    new Setting(this.containerEl).setName('Password').setHeading()
+    new Setting(this.containerEl).setName('Password login').setHeading()
 
     this.state.description = new Setting(this.containerEl)
-      .setName('ID')
+      .setName('Account')
       .addText((text) => {
         this.state.idInput = text
         return text.setPlaceholder('ID').onChange((value) => (this.state.id = value))
@@ -192,7 +192,7 @@ export class NaverSettingTab extends PluginSettingTab {
 
     this.state.captchaDiv = this.containerEl.createEl('div')
 
-    new Setting(this.containerEl).setName('One-time number').setHeading()
+    new Setting(this.containerEl).setName('One-time number login').setHeading()
 
     new Setting(this.containerEl)
       .setName('일회용 번호')
@@ -212,7 +212,7 @@ export class NaverSettingTab extends PluginSettingTab {
           button.setDisabled(true)
           const success = await this.onClickOneTimeLogin()
           if (success) {
-            await this.display()
+            this.display()
           } else {
             this.state.description?.setDesc('일회용 로그인 번호를 확인한 후 다시 입력해 주세요.')
             this.state.oneTimeInput?.setValue('')
@@ -332,7 +332,7 @@ export class NaverSettingTab extends PluginSettingTab {
       this.displayMobileLoginSetting()
     }
 
-    new Setting(this.containerEl).setName('Sync options').setHeading()
+    new Setting(this.containerEl).setName('General').setHeading()
 
     new Setting(this.containerEl)
       .setName('폴더 이름')
