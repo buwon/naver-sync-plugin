@@ -332,7 +332,7 @@ export class NaverSettingTab extends PluginSettingTab {
       this.displayMobileLoginSetting()
     }
 
-    new Setting(this.containerEl).setName('General').setHeading()
+    new Setting(this.containerEl).setName('Synchronization').setHeading()
 
     new Setting(this.containerEl)
       .setName('폴더 이름')
