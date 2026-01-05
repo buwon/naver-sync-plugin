@@ -168,11 +168,11 @@ export async function sync(vault: Vault, remote: Remote, fileManager: FileManage
 
     // download remote files
     const downloadedKeys = await downloadFiles({ vault, remote, fileManager, remoteList, files })
-    await Promise.all(Array.from(downloadedKeys).map((key) => files.delete(key)))
+    Array.from(downloadedKeys).forEach((key) => files.delete(key))
 
     // upload remaining local files
     const uploadedKeys = await uploadFiles({ vault, files, remote })
-    await Promise.all(Array.from(uploadedKeys).map((key) => files.delete(key)))
+    Array.from(uploadedKeys).forEach((key) => files.delete(key))
 
     // update last sync time
     event.emit('updateLastSyncTime')
