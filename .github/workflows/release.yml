@@ -50,4 +50,4 @@ jobs:
           gh release create "${{ steps.version.outputs.VERSION }}" \
             --title="${{ steps.version.outputs.VERSION }}" \
             --draft \
-            naver-sync.zip
+            naver-sync.zip naver-sync/main.js naver-sync/manifest.json
