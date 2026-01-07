@@ -136,7 +136,7 @@ export class NaverSettingTab extends PluginSettingTab {
     } else {
       const captchaSrc = await desktopProvider
         .web()
-        .executeJavaScript<string>('document.querySelector("img#captchaimg").src')
+        .executeJavaScript<string>('document.querySelector("img#captchaimg")?.src')
       if (captchaSrc) {
         await this.displayCaptcha(captchaSrc)
       } else {
@@ -307,6 +307,7 @@ export class NaverSettingTab extends PluginSettingTab {
     this.containerEl.empty()
     this.state.id = ''
     this.state.password = ''
+    this.state.captcha = ''
     this.state.oneTime = ''
   }
 
@@ -317,7 +318,6 @@ export class NaverSettingTab extends PluginSettingTab {
 
     const ready = await this.isLoggedInNaver()
     if (ready) {
-      event.emit('status', 'check')
       const groupList = await this.fetchGroupList()
       this.groupList = {}
       groupList.forEach((group) => {
@@ -325,7 +325,6 @@ export class NaverSettingTab extends PluginSettingTab {
       })
       this.displayLogoutSetting()
     } else {
-      event.emit('status', 'alert')
       const selectedFolderName = this.plugin.settings.folderName
       this.groupList = { [selectedFolderName]: selectedFolderName }
       this.displayDesktopLoginSetting()
