@@ -1,7 +1,7 @@
 {
   "id": "naver-sync",
   "name": "NAVER Sync",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "minAppVersion": "1.4.0",
   "description": "Sync your vault with NAVER memo service.",
   "author": "Buwon Lee",
