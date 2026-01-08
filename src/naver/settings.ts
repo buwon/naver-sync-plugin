@@ -372,10 +372,10 @@ export class NaverSettingTab extends PluginSettingTab {
         dropdown
           .addOptions({
             0: '(not set)',
-            60000: 'Every 1 minutes',
-            180000: 'Every 3 minutes',
-            300000: 'Every 5 minutes',
-            600000: 'Every 10 minutes',
+            60000: 'After 1 minutes',
+            180000: 'After 3 minutes',
+            300000: 'After 5 minutes',
+            600000: 'After 10 minutes',
           })
           .setValue(this.plugin.settings.onSaveInterval.toString())
           .onChange((value) => {
